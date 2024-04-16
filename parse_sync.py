@@ -24,21 +24,6 @@ class ParserBaseclass:
             url=door_url,
         ))
 
-    def _get_relics(self, items_div) -> list:
-        """
-        Find the names of all relics in the div element and add them to the list.
-        """
-        result = []
-        for item in items_div:
-            if item.find('div', class_='split-sets row'):
-                buttons = item.findAll('button', class_='accordion-button collapsed')
-                relic_set = " + ".join([item.find_next('div').next_sibling.strip() for item in buttons])
-                result.append(relic_set)
-            else:
-                relic_set = item.find('button', class_='accordion-button collapsed').\
-                    find_next('div').next_sibling.strip()
-                result.append(relic_set)
-        return result
 
     @staticmethod
     def _get_best_stats(soup) -> dict:
@@ -100,15 +85,6 @@ class DoorParserSync(ParserBaseclass):
             door_url = door.find('a').get('href')
             door_url = URL_ROOT + door_url
             self._parse_door(door_url)
-        # self.characters[character_name].element = soup.find('div', class_='character-top').\
-        #     find('strong').attrs.get('class')[0]
-        # relic_divs = soup.find('div', class_='relics row row-cols-xxl-2 row-cols-xl-2 row-cols-1').\
-        #     findChildren('div', class_='col')
-        # relic_items_div = relic_divs[0].findAll("div", class_='relic-sets-rec')
-        # planetary_items_div = relic_divs[1].findAll("div", class_='relic-sets-rec')
-        # self.characters[character_name].best_relic_sets = self._get_relics(relic_items_div)
-        # self.characters[character_name].best_planetary_sets = self._get_relics(planetary_items_div)
-        # self.characters[character_name].best_stats = self._get_best_stats(soup)
 
     def _parse_door(self, door_url: str) -> None:
         soup = BeautifulSoup(requests.get(url=door_url).text, 'lxml')
@@ -119,10 +95,6 @@ class DoorParserSync(ParserBaseclass):
             file.write(image_bytes)
 
 
-
-
 if __name__ == "__main__":
     my_parser = DoorParserSync(FIRST_PAGE_URL)
     my_parser.parse()
-
-
