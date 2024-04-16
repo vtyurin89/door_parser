@@ -1,33 +1,27 @@
 import requests
 import csv
+
+import random
+
 from bs4 import BeautifulSoup
 
 
 from models import Door
-from constants import URL, URL_ROOT
+from constants import FIRST_PAGE_URL, URL_ROOT
 from utils import calculate_time_decorator
-
-
-# TODO
-# FIX parser UnicodeEncodeError
 
 
 class ParserBaseclass:
     """
     This class was designed for website prydwen.gg.
     """
-    def __init__(self, url: str, character_url_first_part: str):
-        self.characters = {}
+    def __init__(self, url: str):
+        self.doors = {}
         self.url = url
-        self.character_url_first_part = character_url_first_part
 
-    @staticmethod
-    def _clean_string(input_str):
-        return input_str.encode('ascii', 'ignore').decode('utf-8')
-
-    def _create_character(self, character_name: str, character_url: str) -> None:
-        self.characters.setdefault(character_name, Character(
-            url=character_url,
+    def _create_door(self, door_url: str) -> None:
+        self.doors.setdefault(door_url, Door(
+            url=door_url,
         ))
 
     def _get_relics(self, items_div) -> list:
@@ -55,68 +49,80 @@ class ParserBaseclass:
 
     @staticmethod
     def create_csv():
-        with open("character_log.csv", mode="w", newline="") as file:
+        with open("door_list.csv", mode="w", newline="") as file:
             writer = csv.writer(file)
             writer.writerow([
-                "name",
                 "url",
-                "element",
-                "best_relic_sets",
-                "best_planetary_sets",
-                "best_stats"
+                "description"
             ])
 
     def write_in_csv(self):
         with open("character_log.csv", mode="a", newline="") as file:
             writer = csv.writer(file)
             for character in self.characters.values():
-                try:
-                    writer.writerow([
-                        character.real_name,
-                        character.url,
-                        character.element,
-                        character.best_relic_sets,
-                        character.best_planetary_sets,
-                        character.best_stats
-                    ])
-                except UnicodeEncodeError:
-                    print('==================================================================================')
-                    print(f"Unicode Encode error occurred with the character {character.real_name}")
-                    print(f"Character INFO: {character.__dict__}")
-                    print('==================================================================================')
+                writer.writerow([
+                    character.real_name,
+                    character.url,
+                    character.element,
+                    character.best_relic_sets,
+                    character.best_planetary_sets,
+                    character.best_stats
+                ])
 
 
-class HSRParserSync(ParserBaseclass):
+class DoorParserSync(ParserBaseclass):
 
-    def __init__(self, url: str, character_url_first_part: str):
-        super().__init__(url, character_url_first_part)
+    def __init__(self, url: str):
+        super().__init__(url)
 
     @calculate_time_decorator
     def parse(self) -> None:
         self.create_csv()
         soup = BeautifulSoup(requests.get(url=self.url).text, 'lxml')
-        character_divs = soup.findAll("div", class_='avatar-card card')
-        for character_div in character_divs:
-            character_url = URL_ROOT + character_div.find('a').attrs.get('href')
-            character_name = character_url.split(CHARACTER_URL_FIRST_PART)[1]
-            self._create_character(character_name, character_url)
-            self._parse_individual_character(character_url, character_name)
-        self.write_in_csv()
+        paginate_items = soup.findAll("li", class_='pagination__item')
+        for paginate_item in paginate_items:
+            if 'active' in paginate_item['class']:
+                self._parse_page_with_doors(FIRST_PAGE_URL)
+            else:
+                doors_page_url = paginate_item.find('a').get('href')
+                doors_page_url.replace("http", "https")
+                self._parse_page_with_doors(doors_page_url)
 
-    def _parse_individual_character(self, character_url: str, character_name: str) -> None:
-        soup = BeautifulSoup(requests.get(url=character_url).text, 'lxml')
-        self.characters[character_name].real_name = soup.find('div', class_='character-top').find('strong').text
-        self.characters[character_name].element = soup.find('div', class_='character-top').\
-            find('strong').attrs.get('class')[0]
-        relic_divs = soup.find('div', class_='relics row row-cols-xxl-2 row-cols-xl-2 row-cols-1').\
-            findChildren('div', class_='col')
-        relic_items_div = relic_divs[0].findAll("div", class_='relic-sets-rec')
-        planetary_items_div = relic_divs[1].findAll("div", class_='relic-sets-rec')
-        self.characters[character_name].best_relic_sets = self._get_relics(relic_items_div)
-        self.characters[character_name].best_planetary_sets = self._get_relics(planetary_items_div)
-        self.characters[character_name].best_stats = self._get_best_stats(soup)
+
+            # self._create_character(character_name, character_url)
+            # self._parse_individual_character(character_url, character_name)
+        # self.write_in_csv()
+
+    def _parse_page_with_doors(self, doors_page_url: str) -> None:
+        soup = BeautifulSoup(requests.get(url=doors_page_url).text, 'lxml')
+        doors = soup.findAll('div', class_='products__item')
+        for door in doors:
+            door_url = door.find('a').get('href')
+            door_url = URL_ROOT + door_url
+            self._parse_door(door_url)
+        # self.characters[character_name].element = soup.find('div', class_='character-top').\
+        #     find('strong').attrs.get('class')[0]
+        # relic_divs = soup.find('div', class_='relics row row-cols-xxl-2 row-cols-xl-2 row-cols-1').\
+        #     findChildren('div', class_='col')
+        # relic_items_div = relic_divs[0].findAll("div", class_='relic-sets-rec')
+        # planetary_items_div = relic_divs[1].findAll("div", class_='relic-sets-rec')
+        # self.characters[character_name].best_relic_sets = self._get_relics(relic_items_div)
+        # self.characters[character_name].best_planetary_sets = self._get_relics(planetary_items_div)
+        # self.characters[character_name].best_stats = self._get_best_stats(soup)
+
+    def _parse_door(self, door_url: str) -> None:
+        soup = BeautifulSoup(requests.get(url=door_url).text, 'lxml')
+        door_img = soup.find("div", class_='product__img-wrap').find('img').get('src')
+        door_img_url = URL_ROOT + door_img
+        image_bytes = requests.get(door_img_url).content
+        with open(f"pics/{random.randint(1, 10000)}.jpg", "wb") as file:
+            file.write(image_bytes)
+
+
 
 
 if __name__ == "__main__":
-    my_parser = HSRParserSync(URL, CHARACTER_URL_FIRST_PART)
+    my_parser = DoorParserSync(FIRST_PAGE_URL)
     my_parser.parse()
+
+
