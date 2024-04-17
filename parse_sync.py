@@ -12,9 +12,7 @@ from utils import calculate_time_decorator
 
 
 class ParserBaseclass:
-    """
-    This class was designed for website prydwen.gg.
-    """
+
     def __init__(self, url: str):
         self.doors = {}
         self.url = url
@@ -23,7 +21,6 @@ class ParserBaseclass:
         self.doors.setdefault(door_url, Door(
             url=door_url,
         ))
-
 
     @staticmethod
     def _get_best_stats(soup) -> dict:
